@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mavtra_ui_test/core/constants/app_colors.dart';
+import 'package:mavtra_ui_test/features/login/bloc/auth_bloc.dart';
+import 'package:mavtra_ui_test/features/login/bloc/auth_event.dart';
+import 'package:mavtra_ui_test/features/login/bloc/auth_state.dart';
 import '../../../bottom_nav_bar/views/screens/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -10,9 +14,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _urlController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _urlController = TextEditingController(text: "147.93.104.44:8069");
+  final _usernameController = TextEditingController(text: "admin");
+  final _passwordController = TextEditingController(text: "8433");
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
@@ -21,20 +26,43 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 40),
-              _buildHeader(),
-              const SizedBox(height: 32),
-              _buildLoginForm(),
-              const SizedBox(height: 32),
-              _buildLoginButton(),
-              const SizedBox(height: 24),
-              _buildSignUpSection(),
-            ],
+        child: BlocListener<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state is AuthAuthenticated) {
+              // Navigate to main screen on successful authentication
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const BottomNavBar()),
+              );
+            } else if (state is AuthError) {
+              // Show error message
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 40),
+                  _buildHeader(),
+                  const SizedBox(height: 32),
+                  _buildLoginForm(),
+                  const SizedBox(height: 32),
+                  _buildLoginButton(),
+                  const SizedBox(height: 24),
+                  _buildSignUpSection(),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -80,6 +108,12 @@ class _LoginScreenState extends State<LoginScreen> {
           hint: 'https://your-company.mavtra.com',
           keyboardType: TextInputType.url,
           prefixIcon: Icons.language,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter server URL';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: 20),
         _buildTextField(
@@ -88,6 +122,12 @@ class _LoginScreenState extends State<LoginScreen> {
           hint: 'Enter your username',
           keyboardType: TextInputType.text,
           prefixIcon: Icons.person_outline,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter your username';
+            }
+            return null;
+          },
         ),
         const SizedBox(height: 20),
         _buildTextField(
@@ -96,6 +136,12 @@ class _LoginScreenState extends State<LoginScreen> {
           hint: 'Enter your password',
           obscureText: _obscurePassword,
           prefixIcon: Icons.lock_outline,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter your password';
+            }
+            return null;
+          },
           suffixIcon: IconButton(
             onPressed: () {
               setState(() {
@@ -130,7 +176,9 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const Spacer(),
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                // TODO: Implement forgot password functionality
+              },
               child: Text(
                 'Forgot Password?',
                 style: TextStyle(
@@ -154,6 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
     bool obscureText = false,
     IconData? prefixIcon,
     Widget? suffixIcon,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,6 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: controller,
           keyboardType: keyboardType,
           obscureText: obscureText,
+          validator: validator,
           style: const TextStyle(color: AppColors.white),
           decoration: InputDecoration(
             hintText: hint,
@@ -202,6 +252,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: 1,
               ),
             ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Colors.red,
+                width: 1,
+              ),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Colors.red,
+                width: 1,
+              ),
+            ),
+            errorStyle: const TextStyle(
+              color: Colors.red,
+              fontSize: 12,
+            ),
           ),
         ),
       ],
@@ -209,35 +277,70 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const BottomNavBar()),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.black,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, state) {
+        final isLoading = state is AuthLoading;
+
+        return SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: isLoading ? null : _handleLogin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.black,
+              disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+              shadowColor: Colors.transparent,
+            ),
+            child: isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(AppColors.black),
+                    ),
+                  )
+                : const Text(
+                    'Sign In',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.black,
+                    ),
+                  ),
           ),
-          elevation: 0,
-          shadowColor: Colors.transparent,
-        ),
-        child:  Text(
-          'Sign In',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppColors.black
-          ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  void _handleLogin() {
+    // Clear any previous errors
+    context.read<AuthBloc>().add(const AuthClearError());
+
+    if (_formKey.currentState?.validate() ?? false) {
+      // Extract base URL from the full URL
+      final url = _urlController.text.trim();
+      final username = _usernameController.text.trim();
+      final password = _passwordController.text.trim();
+
+      // Dispatch login event
+      context.read<AuthBloc>().add(
+            AuthLoginRequested(
+              url: url,
+              login: username,
+              password: password,
+              appType: 'mobile', // or whatever app type you need
+              firebaseToken: "", // Add Firebase token if you have it
+            ),
+          );
+    }
   }
 
   Widget _buildDivider() {
@@ -276,13 +379,17 @@ class _LoginScreenState extends State<LoginScreen> {
         _buildSocialButton(
           icon: Icons.g_mobiledata,
           text: 'Continue with Google',
-          onPressed: () {},
+          onPressed: () {
+            // TODO: Implement Google login
+          },
         ),
         const SizedBox(height: 12),
         _buildSocialButton(
           icon: Icons.apple,
           text: 'Continue with Apple',
-          onPressed: () {},
+          onPressed: () {
+            // TODO: Implement Apple login
+          },
         ),
       ],
     );
@@ -337,7 +444,9 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         GestureDetector(
-          onTap: () {},
+          onTap: () {
+            // TODO: Implement contact admin functionality
+          },
           child: Text(
             'Contact Admin',
             style: TextStyle(

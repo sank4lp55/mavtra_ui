@@ -1,6 +1,7 @@
 // lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:mavtra_ui_test/features/activity/views/screens/activity_detail_screen.dart';
 import 'package:mavtra_ui_test/features/sanding/views/screens/sanding_mmn_screen.dart';
 import '../widgets/erp_module_card.dart';
 import '../widgets/activity_tile.dart';
@@ -23,7 +24,7 @@ class HomeScreen extends StatelessWidget {
               _buildHeader(context),
               _buildStatsCards(),
               _buildQuickAccessModules(context),
-              _buildRecentActivity(),
+              _buildRecentActivity(context),
             ],
           ),
         ),
@@ -238,8 +239,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-
-  Widget _buildRecentActivity() {
+  Widget _buildRecentActivity(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(20),
       child: Column(
@@ -273,7 +273,22 @@ class HomeScreen extends StatelessWidget {
                 subtitle: 'Sale order for ₹2,45,000 • 2 hours ago',
                 icon: Icons.check_circle,
                 iconColor: const Color(0xFF10B981),
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ActivityDetailScreen(
+                        activityId: 'PO-2024-089',
+                        title: 'PO-2024-089 Created',
+                        subtitle:
+                            'Purchase order for raw materials • 4 hours ago',
+                        icon: Icons.add_circle_outline,
+                        iconColor: AppColors.primary,
+                        timestamp: '4 hours ago',
+                      ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 12),
               ActivityTile(
