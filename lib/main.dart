@@ -1,10 +1,8 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:mavtra_ui_test/main_screen.dart';
-
-import 'app_colors.dart';
-import 'onboarding_screen.dart';
+import 'core/constants/app_colors.dart';
+import 'features/bottom_nav_bar/views/screens/main_screen.dart';
 
 
 void main() {
@@ -31,7 +29,7 @@ class MyApp extends StatelessWidget {
           iconTheme: IconThemeData(color: AppColors.primary),
         ),
       ),
-      home: const MainScreen(),
+      home: const BottomNavBar(),
     );
   }
 }
