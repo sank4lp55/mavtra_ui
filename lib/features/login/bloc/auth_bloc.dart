@@ -1,4 +1,6 @@
 // auth_bloc.dart
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mavtra_ui_test/core/services/api_service.dart';
 import 'package:mavtra_ui_test/core/services/auth_service.dart';
@@ -23,8 +25,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthTokenRefreshRequested>(_onTokenRefreshRequested);
     on<AuthClearError>(_onClearError);
 
-    // Check authentication status when bloc is created
-    add(const AuthCheckStatus());
+    // Delay initial auth check to ensure platform is ready
+    _scheduleInitialAuthCheck();
+  }
+
+  void _scheduleInitialAuthCheck() {
+    // Schedule auth check after a short delay to ensure platform channels are ready
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!isClosed) {
+        add(const AuthCheckStatus());
+      }
+    });
   }
 
   Future<void> _onLoginRequested(
@@ -97,24 +108,55 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       Emitter<AuthState> emit,
       ) async {
     try {
+      // Add a small delay to ensure platform channels are ready
+      await Future.delayed(const Duration(milliseconds: 100));
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString(_tokenKey);
       final userDataJson = prefs.getString(_userDataKey);
 
       if (token != null && userDataJson != null) {
-        // Parse stored user data
-        final userData = AuthResultModel.fromJson(
-          Map<String, dynamic>.from(
-            // You might need to use json.decode here if storing as JSON string
-              {} // Replace with actual parsing logic
-          ),
-        );
+        try {
+          // Parse stored user data from JSON string
+          final Map<String, dynamic> userDataMap = json.decode(userDataJson);
+          final userData = AuthResultModel.fromJson(userDataMap);
 
-        emit(AuthAuthenticated(
-          user: userData,
-          token: token,
-        ));
+          // Verify token is still valid (optional: you could add expiry check here)
+          emit(AuthAuthenticated(
+            user: userData,
+            token: token,
+          ));
+        } catch (parseError) {
+          print('Error parsing stored user data: $parseError');
+          // Clear corrupted data
+          await _clearAuthData();
+          emit(const AuthUnauthenticated());
+        }
       } else {
+        emit(const AuthUnauthenticated());
+      }
+    } on PlatformException catch (e) {
+      print('Platform error accessing SharedPreferences: ${e.message}');
+      // Retry after a longer delay
+      try {
+        await Future.delayed(const Duration(milliseconds: 500));
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString(_tokenKey);
+
+        if (token != null) {
+          final userDataJson = prefs.getString(_userDataKey);
+          if (userDataJson != null) {
+            final Map<String, dynamic> userDataMap = json.decode(userDataJson);
+            final userData = AuthResultModel.fromJson(userDataMap);
+            emit(AuthAuthenticated(user: userData, token: token));
+          } else {
+            emit(const AuthUnauthenticated());
+          }
+        } else {
+          emit(const AuthUnauthenticated());
+        }
+      } catch (retryError) {
+        print('Retry failed: $retryError');
         emit(const AuthUnauthenticated());
       }
     } catch (e) {
@@ -168,8 +210,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_tokenKey, token);
-      await prefs.setString(_userDataKey, userData.toJson().toString());
-      // You might want to use json.encode for proper JSON storage
+      // Convert to proper JSON string
+      await prefs.setString(_userDataKey, json.encode(userData.toJson()));
+    } on PlatformException catch (e) {
+      print('Platform error saving auth data: ${e.message}');
+      // Retry once
+      try {
+        await Future.delayed(const Duration(milliseconds: 200));
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, token);
+        await prefs.setString(_userDataKey, json.encode(userData.toJson()));
+      } catch (retryError) {
+        print('Failed to save auth data after retry: $retryError');
+      }
     } catch (e) {
       print('Error saving auth data: $e');
     }
@@ -180,6 +233,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_tokenKey);
       await prefs.remove(_userDataKey);
+    } on PlatformException catch (e) {
+      print('Platform error clearing auth data: ${e.message}');
+      // Retry once
+      try {
+        await Future.delayed(const Duration(milliseconds: 200));
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_tokenKey);
+        await prefs.remove(_userDataKey);
+      } catch (retryError) {
+        print('Failed to clear auth data after retry: $retryError');
+      }
     } catch (e) {
       print('Error clearing auth data: $e');
     }

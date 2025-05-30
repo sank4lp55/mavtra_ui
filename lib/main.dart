@@ -12,6 +12,9 @@ import 'features/bottom_nav_bar/views/screens/main_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Add a small delay to ensure platform is fully ready
+  await Future.delayed(const Duration(milliseconds: 100));
+
   // Initialize APIService - it will automatically load saved base URL from SharedPreferences
   // or use default URL if none is saved
   await APIServiceSingleton.initialize(

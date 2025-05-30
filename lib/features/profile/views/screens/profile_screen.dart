@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:mavtra_ui_test/core/constants/app_colors.dart';
 import 'package:mavtra_ui_test/features/profile/models/menu_item_data.dart';
+import 'package:mavtra_ui_test/features/profile/views/widget/logout_handler.dart';
 import '../../../contact_us/views/screens/contact_us_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -162,7 +163,9 @@ class ProfileScreen extends StatelessWidget {
       MenuItemData(
         icon: Icons.logout,
         title: 'Logout',
-        onTap: () {},
+        onTap: () {
+          LogoutHandler.showLogoutDialog(context);
+        },
         isDestructive: true,
       ),
     ];
